@@ -14,7 +14,12 @@ if (production && !existsSync(resolve(staticDirectory, 'index.html')))
   throw new Error(
     'Build the frontend with npm run build before starting production mode.',
   );
-const configuredOrigins = process.env.APP_ORIGIN?.split(',')
+// Render provides its public HTTPS address at runtime. APP_ORIGIN remains the
+// explicit setting for all other production deployments.
+const applicationOrigin =
+  process.env.APP_ORIGIN ?? process.env.RENDER_EXTERNAL_URL;
+const configuredOrigins = applicationOrigin
+  ?.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 if (production && (!configuredOrigins || configuredOrigins.length === 0))

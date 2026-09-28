@@ -100,6 +100,12 @@ Provision an empty production database with `npm run admin:create`, using `LABLI
 
 Set `DATABASE_PATH` to a durable storage location and `APP_ORIGIN` to the exact HTTPS browser origin, without a trailing slash. Run behind a TLS-terminating reverse proxy. The server binds to loopback by default; change `HOST` only to match the deployment architecture. Production cookies are Secure, HttpOnly and SameSite=Strict; plain HTTP is not the supported production login path. Ensure the reverse proxy routes both application pages and `/api` to the server.
 
+### Free review deployment on Render
+
+For a short colleague review, deploy the public GitHub repository as a **Web Service** on [Render](https://render.com/docs/your-first-deploy). The included `render.yaml` selects the Node runtime, builds the application, binds it publicly and uses Render's HTTPS URL as the trusted application origin automatically. Create the service with the **Free** plan, then share its `onrender.com` address.
+
+This configuration deliberately uses `/tmp/lablink.sqlite` and preview-only communications. Render's free web services lose local files when they restart or spin down, so it is suitable for demonstration records only. Do not enter real patient data or credentials there. A durable deployment needs a persistent database and configured messaging providers.
+
 ```powershell
 $env:APP_ORIGIN = 'https://lab.example.org'
 $env:DATABASE_PATH = 'C:\LabLinkData\lablink.sqlite'

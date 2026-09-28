@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: lablink-review
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_PATH
+        value: /tmp/lablink.sqlite
+      - key: LABLINK_DELIVERY_MODE
+        value: preview
