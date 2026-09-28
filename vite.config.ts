@@ -18,8 +18,8 @@ export default defineConfig({
     host: '127.0.0.1',
     port: Number(process.env.FRONTEND_PORT ?? 5173),
     strictPort: true,
-    // Temporary review links created by localtunnel use a subdomain of loca.lt.
-    allowedHosts: ['.loca.lt'],
+    // Temporary review links use provider subdomains.
+    allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     proxy: {
       '/api': { target: `http://127.0.0.1:${process.env.PORT ?? 3001}` },
     },
