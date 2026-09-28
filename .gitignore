@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+*.sqlite*
+*.db*
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+*.log
+cloudflared.exe
+lablink-replit-deploy-*.zip

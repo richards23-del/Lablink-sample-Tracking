@@ -1,0 +1,6 @@
+entrypoint = "server/index.ts"
+run = "npm run dev"
+
+[deployment]
+build = "npm run build"
+run = "npx cross-env HOST=0.0.0.0 npm start"
