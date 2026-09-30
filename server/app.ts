@@ -51,6 +51,12 @@ const COOKIE_NAME = 'lablink_session';
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 const PREAUTH_DURATION_MS = 60 * 60 * 1000;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOCAL_SETUP_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+]);
 
 export interface AppOptions {
   databasePath: string;
@@ -108,6 +114,12 @@ function loopback(request: Request): boolean {
   return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(
     request.socket.remoteAddress ?? '',
   );
+}
+
+/** A reverse proxy can make an internet request look loopback to Express. */
+function localSetupRequest(request: Request): boolean {
+  const origin = request.get('origin');
+  return loopback(request) && (!origin || LOCAL_SETUP_ORIGINS.has(origin));
 }
 
 export function createApp(options: AppOptions) {
@@ -234,7 +246,7 @@ export function createApp(options: AppOptions) {
       user: auth.user,
       csrfToken: auth.session?.csrf_token ?? null,
       setupRequired: setupRequired(),
-      setupAllowed: !production && loopback(request),
+      setupAllowed: !production && localSetupRequest(request),
     };
   }
 
@@ -283,7 +295,7 @@ export function createApp(options: AppOptions) {
   });
 
   app.post('/api/auth/setup', (request, response) => {
-    if (production || !loopback(request))
+    if (production || !localSetupRequest(request))
       throw new ApiError(
         403,
         'Browser setup is available only on the local development server. Ask the administrator to provision an account.',
@@ -363,6 +375,12 @@ export function createApp(options: AppOptions) {
       throw new ApiError(
         429,
         'Too many account creation attempts. Try again in 15 minutes.',
+        'RATE_LIMITED',
+      );
+    if (!current && registrationAttempts.size >= 10_000)
+      throw new ApiError(
+        429,
+        'Account creation is temporarily busy. Try again later.',
         'RATE_LIMITED',
       );
     registrationAttempts.set(key, {

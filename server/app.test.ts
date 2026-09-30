@@ -238,6 +238,24 @@ describe('authentication and request boundaries', () => {
     );
   });
 
+  it('does not expose development setup through a public reverse proxy', async () => {
+    const instance = backend({ allowedOrigins: ['https://review.example'] });
+    const session = await request(instance.app)
+      .get('/api/auth/session')
+      .set('Origin', 'https://review.example');
+    expect(session.status).toBe(200);
+    expect(session.body.setupAllowed).toBe(false);
+    const cookie = session.headers['set-cookie'][0].split(';')[0];
+    const setup = await request(instance.app)
+      .post('/api/auth/setup')
+      .set('Cookie', cookie)
+      .set('Origin', 'https://review.example')
+      .set('X-CSRF-Token', session.body.csrfToken)
+      .send(WORKSPACE);
+    expect(setup.status).toBe(403);
+    expect(setup.body.code).toBe('SETUP_DISABLED');
+  });
+
   it('lets portal users self-register but never grants laboratory staff roles', async () => {
     const instance = await initialized();
     const patient = instance.client();
