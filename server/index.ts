@@ -74,7 +74,11 @@ app.use('/w/:workspace', (request, response, next) => {
     );
   let workspace = workspaces.get(record.slug);
   if (!workspace) {
-    workspace = createApp({ ...appOptions, databasePath: record.databasePath });
+    workspace = createApp({
+      ...appOptions,
+      databasePath: record.databasePath,
+      cookiePath: `/w/${record.slug}`,
+    });
     workspaces.set(record.slug, workspace);
     workers.push(startWorker(workspace.samples, workspace.communications));
   }

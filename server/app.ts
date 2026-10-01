@@ -69,6 +69,8 @@ export interface AppOptions {
   loginMaxAttempts?: number;
   enqueueCommunication?: EnqueueCommunication;
   communications?: CommunicationsOptions;
+  /** Keeps browser sessions isolated when this application is mounted per lab. */
+  cookiePath?: string;
   workspaceProvisioner?: {
     provision: (input: WorkspaceInput) => ProvisionedWorkspace;
   };
@@ -130,6 +132,9 @@ export function createApp(options: AppOptions) {
   const now = options.now ?? (() => new Date());
   const production =
     options.production ?? process.env.NODE_ENV === 'production';
+  const cookiePath = options.cookiePath ?? '/';
+  if (!/^\/(?:[a-z0-9-]+\/)*[a-z0-9-]*$/.test(cookiePath))
+    throw new Error('Cookie path must be an absolute application path.');
   const allowedOrigins = new Set(
     options.allowedOrigins ?? [
       'http://localhost:5173',
@@ -237,7 +242,7 @@ export function createApp(options: AppOptions) {
       httpOnly: true,
       sameSite: 'strict',
       secure: production,
-      path: '/',
+      path: cookiePath,
       maxAge: user ? SESSION_DURATION_MS : PREAUTH_DURATION_MS,
     });
     response.locals.auth = { user, session: row } satisfies AuthContext;

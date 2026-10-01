@@ -256,6 +256,13 @@ describe('authentication and request boundaries', () => {
     expect(setup.body.code).toBe('SETUP_DISABLED');
   });
 
+  it('scopes browser session cookies to a mounted laboratory workspace', async () => {
+    const instance = backend({ cookiePath: '/w/test-lab' });
+    const client = instance.client();
+    const session = await client.session();
+    expect(session.headers['set-cookie'][0]).toContain('Path=/w/test-lab');
+  });
+
   it('lets portal users self-register but never grants laboratory staff roles', async () => {
     const instance = await initialized();
     const patient = instance.client();
