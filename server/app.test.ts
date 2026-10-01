@@ -310,6 +310,52 @@ describe('authentication and request boundaries', () => {
     }
   });
 
+  it('issues one-time password resets without exposing account existence', async () => {
+    const resetUrls: string[] = [];
+    const sendPasswordReset = async (_email: string, resetUrl: string) => {
+      resetUrls.push(resetUrl);
+    };
+    const instance = await initialized({ sendPasswordReset });
+    const requested = await instance.admin.post(
+      '/api/auth/password-reset/request',
+      {
+        email: WORKSPACE.email,
+      },
+    );
+    expect(requested.status).toBe(202);
+    expect(requested.body.message).toMatch(/If an account matches/);
+    expect(resetUrls).toHaveLength(1);
+    const resetUrl = new URL(resetUrls[0]);
+    const token = resetUrl.searchParams.get('token');
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
+    const completed = await instance.admin.post(
+      '/api/auth/password-reset/confirm',
+      {
+        token,
+        password: 'updated-test-password-2026',
+      },
+    );
+    expect(completed.status).toBe(200);
+    const replacement = instance.client();
+    await replacement.session();
+    expect(
+      (
+        await replacement.post('/api/auth/login', {
+          email: WORKSPACE.email,
+          password: 'updated-test-password-2026',
+        })
+      ).status,
+    ).toBe(200);
+    const duplicate = await replacement.post(
+      '/api/auth/password-reset/confirm',
+      {
+        token,
+        password: 'another-test-password-2026',
+      },
+    );
+    expect(duplicate.status).toBe(400);
+  });
+
   it('creates an isolated lab-space through the configured provisioner', async () => {
     const provision = vi.fn(() => ({
       slug: 'new-lab',

@@ -3,8 +3,10 @@ import { ArrowRight, FlaskConical, Loader2, TestTube2 } from 'lucide-react';
 import type { Session } from '@shared/types';
 import {
   ApiError,
+  useConfirmPasswordReset,
   useCreateWorkspace,
   useLogin,
+  useRequestPasswordReset,
   useRegister,
   useSetup,
 } from '@/lib/api';
@@ -14,15 +16,21 @@ import { Label } from '@/components/ui/label';
 
 export default function SignInPage({ session }: { session: Session }) {
   const setup = session.setupRequired && session.setupAllowed;
+  const resetToken = new URLSearchParams(window.location.search).get('token');
   const login = useLogin();
   const initialize = useSetup();
   const register = useRegister();
   const createWorkspace = useCreateWorkspace();
-  const [mode, setMode] = useState<'login' | 'register' | 'workspace'>('login');
+  const requestReset = useRequestPasswordReset();
+  const confirmReset = useConfirmPasswordReset();
+  const [mode, setMode] = useState<
+    'login' | 'register' | 'workspace' | 'forgot' | 'reset'
+  >(resetToken ? 'reset' : 'login');
   const [fields, setFields] = useState({
     name: '',
     email: '',
     password: '',
+    passwordConfirmation: '',
     workspaceName: '',
     timezone:
       Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
@@ -32,11 +40,15 @@ export default function SignInPage({ session }: { session: Session }) {
   const [message, setMessage] = useState('');
   const registering = !setup && mode === 'register';
   const creatingWorkspace = !setup && mode === 'workspace';
+  const requestingReset = mode === 'forgot';
+  const resettingPassword = mode === 'reset';
   const pending =
     login.isPending ||
     initialize.isPending ||
     register.isPending ||
-    createWorkspace.isPending;
+    createWorkspace.isPending ||
+    requestReset.isPending ||
+    confirmReset.isPending;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,12 +64,15 @@ export default function SignInPage({ session }: { session: Session }) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email))
       next.email = 'Enter a valid email address.';
     if (
+      !requestingReset &&
       values.password.length <
-      (setup || registering || creatingWorkspace ? 12 : 1)
+        (setup || registering || creatingWorkspace || resettingPassword
+          ? 12
+          : 1)
     )
       next.password = setup
         ? 'Use at least 12 characters.'
-        : registering || creatingWorkspace
+        : registering || creatingWorkspace || resettingPassword
           ? 'Use at least 12 characters.'
           : 'Enter your password.';
     if (setup || registering || creatingWorkspace) {
@@ -72,6 +87,8 @@ export default function SignInPage({ session }: { session: Session }) {
         next.timezone = 'Choose a valid timezone.';
       }
     }
+    if (resettingPassword && values.password !== values.passwordConfirmation)
+      next.passwordConfirmation = 'Passwords do not match.';
     setErrors(next);
     setMessage('');
     if (Object.keys(next).length) return;
@@ -93,6 +110,19 @@ export default function SignInPage({ session }: { session: Session }) {
           timezone: values.timezone,
         });
         window.location.assign(result.workspace.url);
+      } else if (requestingReset) {
+        const result = await requestReset.mutateAsync(values.email);
+        setMessage(result.message);
+      } else if (resettingPassword) {
+        if (!resetToken)
+          throw new Error('This password-reset link is invalid.');
+        const result = await confirmReset.mutateAsync({
+          token: resetToken,
+          password: values.password,
+        });
+        setMessage(result.message);
+        setMode('login');
+        window.history.replaceState({}, '', window.location.pathname);
       } else if (registering)
         await register.mutateAsync({
           name: values.name,
@@ -180,20 +210,28 @@ export default function SignInPage({ session }: { session: Session }) {
           <h2 className="text-2xl font-bold tracking-tight">
             {setup
               ? 'Set up your workspace'
-              : creatingWorkspace
-                ? 'Create your lab space'
-                : registering
-                  ? 'Create your portal account'
-                  : 'Welcome back'}
+              : resettingPassword
+                ? 'Set a new password'
+                : requestingReset
+                  ? 'Reset your password'
+                  : creatingWorkspace
+                    ? 'Create your lab space'
+                    : registering
+                      ? 'Create your portal account'
+                      : 'Welcome back'}
           </h2>
           <p className="mb-7 mt-2 text-sm leading-relaxed text-muted-foreground">
             {setup
               ? 'Create the first administrator account and choose your laboratory timezone.'
-              : creatingWorkspace
-                ? 'Set up an isolated laboratory workspace and its first administrator account.'
-                : registering
-                  ? 'Choose the account that matches how you use the laboratory. Your laboratory must link requests to your account before they appear.'
-                  : 'Sign in with your laboratory account to continue.'}
+              : resettingPassword
+                ? 'Choose a new password with at least 12 characters.'
+                : requestingReset
+                  ? 'Enter your email address. If it matches an account, a reset link will be sent.'
+                  : creatingWorkspace
+                    ? 'Set up an isolated laboratory workspace and its first administrator account.'
+                    : registering
+                      ? 'Choose the account that matches how you use the laboratory. Your laboratory must link requests to your account before they appear.'
+                      : 'Sign in with your laboratory account to continue.'}
           </p>
           {session.setupRequired && !session.setupAllowed ? (
             <div className="rounded-xl border border-border bg-card p-5">
@@ -238,15 +276,24 @@ export default function SignInPage({ session }: { session: Session }) {
                   </p>
                 </div>
               )}
-              {field('email', 'Email', 'email', 'username')}
-              {field(
-                'password',
-                'Password',
-                'password',
-                setup || registering || creatingWorkspace
-                  ? 'new-password'
-                  : 'current-password',
-              )}
+              {!resettingPassword &&
+                field('email', 'Email', 'email', 'username')}
+              {!requestingReset &&
+                field(
+                  'password',
+                  'Password',
+                  'password',
+                  setup || registering || creatingWorkspace || resettingPassword
+                    ? 'new-password'
+                    : 'current-password',
+                )}
+              {resettingPassword &&
+                field(
+                  'passwordConfirmation',
+                  'Confirm new password',
+                  'password',
+                  'new-password',
+                )}
               {(setup || creatingWorkspace) && (
                 <>
                   <p className="-mt-2 text-xs text-muted-foreground">
@@ -309,13 +356,20 @@ export default function SignInPage({ session }: { session: Session }) {
                 )}
                 {setup || creatingWorkspace
                   ? 'Create workspace'
-                  : registering
-                    ? 'Create account'
-                    : 'Sign in'}
+                  : resettingPassword
+                    ? 'Save new password'
+                    : requestingReset
+                      ? 'Send reset link'
+                      : registering
+                        ? 'Create account'
+                        : 'Sign in'}
               </Button>
               {!setup && (
                 <p className="text-center text-sm text-muted-foreground">
-                  {registering || creatingWorkspace
+                  {registering ||
+                  creatingWorkspace ||
+                  requestingReset ||
+                  resettingPassword
                     ? 'Already have an account? '
                     : 'Need an account? '}
                   <button
@@ -323,36 +377,68 @@ export default function SignInPage({ session }: { session: Session }) {
                     className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     onClick={() => {
                       setMode(
-                        registering || creatingWorkspace ? 'login' : 'register',
+                        registering ||
+                          creatingWorkspace ||
+                          requestingReset ||
+                          resettingPassword
+                          ? 'login'
+                          : 'register',
                       );
                       setErrors({});
                       setMessage('');
                     }}
                     disabled={pending}
                   >
-                    {registering || creatingWorkspace
+                    {registering ||
+                    creatingWorkspace ||
+                    requestingReset ||
+                    resettingPassword
                       ? 'Sign in'
                       : 'Create a portal account'}
                   </button>
                 </p>
               )}
-              {!setup && !registering && !creatingWorkspace && (
-                <p className="text-center text-sm text-muted-foreground">
-                  Managing a laboratory?{' '}
-                  <button
-                    type="button"
-                    className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                    onClick={() => {
-                      setMode('workspace');
-                      setErrors({});
-                      setMessage('');
-                    }}
-                    disabled={pending}
-                  >
-                    Create lab space
-                  </button>
-                </p>
-              )}
+              {!setup &&
+                !registering &&
+                !creatingWorkspace &&
+                !requestingReset &&
+                !resettingPassword && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    Managing a laboratory?{' '}
+                    <button
+                      type="button"
+                      className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      onClick={() => {
+                        setMode('workspace');
+                        setErrors({});
+                        setMessage('');
+                      }}
+                      disabled={pending}
+                    >
+                      Create lab space
+                    </button>
+                  </p>
+                )}
+              {!setup &&
+                !registering &&
+                !creatingWorkspace &&
+                !requestingReset &&
+                !resettingPassword && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    <button
+                      type="button"
+                      className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      onClick={() => {
+                        setMode('forgot');
+                        setErrors({});
+                        setMessage('');
+                      }}
+                      disabled={pending}
+                    >
+                      Forgot password?
+                    </button>
+                  </p>
+                )}
             </form>
           )}
         </div>

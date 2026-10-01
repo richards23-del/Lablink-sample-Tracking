@@ -76,6 +76,14 @@ export function openDatabase(filename: string): LabDatabase {
       expires_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_expiration ON sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_user ON password_reset_tokens(user_id, expires_at);
     CREATE TABLE IF NOT EXISTS preferences (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       urgent INTEGER NOT NULL DEFAULT 1,

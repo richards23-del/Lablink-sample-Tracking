@@ -42,6 +42,17 @@ export const setupSchema = userSchema
 export const loginSchema = z
   .object({ email: emailSchema, password: z.string().min(1).max(128) })
   .strict();
+export const passwordResetRequestSchema = z
+  .object({ email: emailSchema })
+  .strict();
+export const passwordResetSchema = z
+  .object({
+    token: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/, 'Use a valid password reset link.'),
+    password: passwordSchema,
+  })
+  .strict();
 /** Public registration deliberately excludes every laboratory staff role. */
 export const portalRegistrationSchema = z
   .object({

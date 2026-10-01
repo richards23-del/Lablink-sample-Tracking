@@ -496,6 +496,46 @@ export class CommunicationsService {
     }
   }
 
+  /** Sends non-clinical account-security mail. It never exposes specimen data. */
+  async sendPasswordReset(to: string, resetUrl: string): Promise<void> {
+    const provider = this.status().providers.email;
+    if (this.mode !== 'live' || !provider.configured) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response = await Promise.race([
+        this.fetcher('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.options.resend!.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: this.options.resend!.from,
+            to: [to],
+            subject: 'Reset your LabLink password',
+            text: `Use this one-time link to set a new LabLink password: ${resetUrl}\n\nThis link expires in 30 minutes. If you did not request it, you can ignore this email.`,
+          }),
+          signal: controller.signal,
+          redirect: 'error',
+        }),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Password reset delivery timed out.'));
+          }, this.timeoutMs);
+        }),
+      ]);
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new Error('Password reset delivery was rejected.');
+      }
+      await response.body?.cancel();
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private row(id: number): OutboxRow {
     if (!Number.isSafeInteger(id) || id < 1)
       throw new ApiError(400, 'Use a valid notification ID.', 'INVALID_ID');

@@ -192,6 +192,24 @@ export function useCreateWorkspace() {
       ),
   });
 }
+export function useRequestPasswordReset() {
+  return useMutation({
+    mutationFn: (email: string) =>
+      request<{ message: string }>('/auth/password-reset/request', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+  });
+}
+export function useConfirmPasswordReset() {
+  return useMutation({
+    mutationFn: (input: { token: string; password: string }) =>
+      request<{ message: string }>('/auth/password-reset/confirm', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  });
+}
 export function useLogout() {
   return useMutation({
     mutationFn: () => request<Session>('/auth/logout', { method: 'POST' }),

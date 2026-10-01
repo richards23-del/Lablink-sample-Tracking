@@ -33,6 +33,8 @@ import {
 import {
   filtersSchema,
   loginSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
   noteSchema,
   portalRegistrationSchema,
   patientAccessSchema,
@@ -52,6 +54,7 @@ const COOKIE_NAME = 'lablink_session';
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 const PREAUTH_DURATION_MS = 60 * 60 * 1000;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const PASSWORD_RESET_DURATION_MS = 30 * 60 * 1000;
 const LOCAL_SETUP_ORIGINS = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -74,6 +77,7 @@ export interface AppOptions {
   workspaceProvisioner?: {
     provision: (input: WorkspaceInput) => ProvisionedWorkspace;
   };
+  sendPasswordReset?: (email: string, resetUrl: string) => Promise<void>;
 }
 
 type SessionRow = {
@@ -171,6 +175,10 @@ export function createApp(options: AppOptions) {
   const dummyPassword = hashPassword(randomBytes(32).toString('hex'));
   const loginAttempts = new Map<string, { count: number; expiresAt: number }>();
   const registrationAttempts = new Map<
+    string,
+    { count: number; expiresAt: number }
+  >();
+  const passwordResetAttempts = new Map<
     string,
     { count: number; expiresAt: number }
   >();
@@ -398,6 +406,27 @@ export function createApp(options: AppOptions) {
     });
   }
 
+  function rateLimitPasswordReset(request: Request): void {
+    const timestamp = now().getTime();
+    for (const [key, value] of passwordResetAttempts)
+      if (value.expiresAt <= timestamp) passwordResetAttempts.delete(key);
+    const key = request.socket.remoteAddress ?? 'unknown';
+    const current = passwordResetAttempts.get(key);
+    if (
+      (current?.count ?? 0) >= 5 ||
+      (!current && passwordResetAttempts.size >= 10_000)
+    )
+      throw new ApiError(
+        429,
+        'Too many reset attempts. Try again in 15 minutes.',
+        'RATE_LIMITED',
+      );
+    passwordResetAttempts.set(key, {
+      count: (current?.count ?? 0) + 1,
+      expiresAt: current?.expiresAt ?? timestamp + LOGIN_WINDOW_MS,
+    });
+  }
+
   app.post('/api/auth/login', (request, response) => {
     const input = loginSchema.parse(request.body);
     rateLimitLogin(request, input.email);
@@ -461,6 +490,102 @@ export function createApp(options: AppOptions) {
     })();
     createSession(response, user, authContext(response).session);
     response.status(201).json(sessionResponse(request, response));
+  });
+
+  app.post('/api/auth/password-reset/request', async (request, response) => {
+    const input = passwordResetRequestSchema.parse(request.body);
+    rateLimitPasswordReset(request);
+    const user = database
+      .prepare('SELECT id, email FROM users WHERE email = ?')
+      .get(input.email) as { id: number; email: string } | undefined;
+    if (user) {
+      const token = randomBytes(32).toString('hex');
+      const timestamp = now().toISOString();
+      database.transaction(() => {
+        database
+          .prepare(
+            'DELETE FROM password_reset_tokens WHERE user_id = ? OR expires_at <= ?',
+          )
+          .run(user.id, now().getTime());
+        database
+          .prepare(
+            'INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
+          )
+          .run(
+            tokenHash(token),
+            user.id,
+            now().getTime() + PASSWORD_RESET_DURATION_MS,
+            timestamp,
+          );
+        database
+          .prepare(
+            'INSERT INTO security_audit (actor_id, action, subject_id, timestamp) VALUES (?, ?, ?, ?)',
+          )
+          .run(null, 'password_reset_requested', user.id, timestamp);
+      })();
+      const origin = request.get('origin') ?? [...allowedOrigins][0];
+      if (origin) {
+        const resetUrl = new URL(`${request.baseUrl}/reset-password`, origin);
+        resetUrl.searchParams.set('token', token);
+        try {
+          await (
+            options.sendPasswordReset ??
+            ((email, url) => communications.sendPasswordReset(email, url))
+          )(user.email, resetUrl.toString());
+        } catch {
+          // Keep the response generic and avoid leaking account or provider details.
+        }
+      }
+    }
+    response.status(202).json({
+      message:
+        'If an account matches that email address, a password-reset link has been sent.',
+    });
+  });
+
+  app.post('/api/auth/password-reset/confirm', (request, response) => {
+    const input = passwordResetSchema.parse(request.body);
+    const timestamp = now().toISOString();
+    const token = database
+      .prepare(
+        'SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?',
+      )
+      .get(tokenHash(input.token), now().getTime()) as
+      { user_id: number } | undefined;
+    if (!token)
+      throw new ApiError(
+        400,
+        'This password-reset link is invalid or has expired.',
+        'INVALID_RESET_TOKEN',
+      );
+    database.transaction(() => {
+      database
+        .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+        .run(hashPassword(input.password), token.user_id);
+      database
+        .prepare(
+          'UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?',
+        )
+        .run(timestamp, tokenHash(input.token));
+      database
+        .prepare(
+          'DELETE FROM password_reset_tokens WHERE user_id = ? AND token_hash <> ?',
+        )
+        .run(token.user_id, tokenHash(input.token));
+      database
+        .prepare('DELETE FROM sessions WHERE user_id = ?')
+        .run(token.user_id);
+      database
+        .prepare(
+          'INSERT INTO security_audit (actor_id, action, subject_id, timestamp) VALUES (?, ?, ?, ?)',
+        )
+        .run(null, 'password_reset_completed', token.user_id, timestamp);
+    })();
+    createSession(response, null, authContext(response).session);
+    response.json({
+      message:
+        'Your password has been changed. Sign in with your new password.',
+    });
   });
 
   app.post('/api/workspaces', (request, response) => {
