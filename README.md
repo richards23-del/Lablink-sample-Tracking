@@ -71,6 +71,8 @@ For live delivery, configure `.env` using [.env.example](.env.example), then res
 
 Messages never include the actual clinical result. Patient messages also exclude rejection reasons and internal instructions. The clinician rejection message includes the recorded reason as requested by the workflow. Provider credentials remain server-side.
 
+Password reset links are one-time tokens that expire after 30 minutes. The reset request always returns the same message whether or not the email belongs to an account. Reset emails use the same Resend configuration and are sent only when `LABLINK_DELIVERY_MODE=live`, `RESEND_API_KEY`, and a verified `RESEND_FROM` value are configured. Preview mode deliberately does not reveal reset links or send email.
+
 The persistent outbox deduplicates events, records attempts and applies bounded retries. Missing provider configuration is reported as blocked. Provider acceptance is shown as **accepted**, not delivered or read; delivery receipts are not implemented. Ambiguous SMS/WhatsApp outcomes are marked uncertain to avoid automatic duplicate sends. Check the provider console before manually retrying an uncertain message. Existing previews do not become live sends when configuration changes.
 
 See [the integration guide](docs/INTEGRATION.md) for connecting an existing LIS/LIMS, event payloads, API keys and idempotent retries. Connected mode enables event imports; the laboratory workspace remains available. A vendor-specific connector must map the existing system's events to this API.
