@@ -66,6 +66,14 @@ const root = createApp({
 const workers = [startWorker(root.samples, root.communications)];
 const workspaces = new Map<string, ReturnType<typeof createApp>>();
 const app = express();
+app.get('/healthz', (_request, response) => {
+  try {
+    root.database.prepare('SELECT 1').get();
+    response.status(200).json({ status: 'ok' });
+  } catch {
+    response.status(503).json({ status: 'unavailable' });
+  }
+});
 app.use('/w/:workspace', (request, response, next) => {
   const record = directory.find(request.params.workspace);
   if (!record)

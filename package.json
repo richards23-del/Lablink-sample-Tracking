@@ -17,7 +17,8 @@
     "format": "prettier --write src shared server tests scripts docs *.json *.ts *.md .github/workflows/*.yml",
     "format:check": "prettier --check src shared server tests scripts docs *.json *.ts *.md .github/workflows/*.yml",
     "check": "npm run typecheck && npm test && npm run build",
-    "admin:create": "tsx server/create-admin.ts"
+    "admin:create": "tsx server/create-admin.ts",
+    "backup": "tsx server/backup.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -145,6 +145,12 @@ Stop the application before taking a file-level backup, and retain the SQLite da
 
 Fresh databases initialize automatically. Schema version 1 is migrated transactionally to version 2 while preserving accounts, sessions, specimens and history. Take a protected backup before upgrading an existing installation. A newer unsupported database version is rejected rather than modified.
 
+## Operations deployment
+
+Use the included Docker deployment for an always-on service with a persistent data volume. Set the exact public HTTPS URL in a protected `.env` file, then run `docker compose -f docker-compose.production.yml up -d --build`. Put TLS in front of the container using a managed reverse proxy or load balancer. `GET /healthz` returns a small readiness response for service monitoring.
+
+Use `npm run backup` with `LABLINK_DATA_DIRECTORY` and `LABLINK_BACKUP_DIRECTORY` to create SQLite online backups without stopping the service. Store encrypted backups outside the server, retain them according to the laboratory's policy, and test restoration in an isolated environment. The backup script includes the root workspace registry and every lab-space database.
+
 ## Project layout
 
 | Path                       | Responsibility                                                       |
