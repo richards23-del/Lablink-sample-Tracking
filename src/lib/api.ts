@@ -45,6 +45,12 @@ export const queryClient = new QueryClient({
 });
 
 let csrfToken: string | null = null;
+function apiRoot(): string {
+  const match = window.location.pathname.match(
+    /^\/w\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/|$)/,
+  );
+  return match ? `/w/${match[1]}/api` : '/api';
+}
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -57,7 +63,7 @@ async function request<T>(
   }
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${apiRoot()}${path}`, {
       ...options,
       credentials: 'same-origin',
       headers: {
@@ -171,6 +177,21 @@ export const useRegister = () =>
     password: string;
     role: 'patient' | 'clinician' | 'transporter';
   }>('/auth/register');
+export function useCreateWorkspace() {
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      email: string;
+      password: string;
+      workspaceName: string;
+      timezone: string;
+    }) =>
+      request<{ workspace: { slug: string; name: string; url: string } }>(
+        '/workspaces',
+        { method: 'POST', body: JSON.stringify(input) },
+      ),
+  });
+}
 export function useLogout() {
   return useMutation({
     mutationFn: () => request<Session>('/auth/logout', { method: 'POST' }),

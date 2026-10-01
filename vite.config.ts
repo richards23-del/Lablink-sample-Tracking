@@ -22,6 +22,9 @@ export default defineConfig({
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     proxy: {
       '/api': { target: `http://127.0.0.1:${process.env.PORT ?? 3001}` },
+      '^/w/[^/]+/api': {
+        target: `http://127.0.0.1:${process.env.PORT ?? 3001}`,
+      },
     },
   },
   preview: { host: '127.0.0.1', port: 4173, strictPort: true },

@@ -303,6 +303,29 @@ describe('authentication and request boundaries', () => {
     }
   });
 
+  it('creates an isolated lab-space through the configured provisioner', async () => {
+    const provision = vi.fn(() => ({
+      slug: 'new-lab',
+      name: 'New Lab',
+      url: '/w/new-lab',
+    }));
+    const instance = backend({ workspaceProvisioner: { provision } });
+    const client = instance.client();
+    await client.session();
+    const created = await client.post('/api/workspaces', {
+      ...WORKSPACE,
+      workspaceName: 'New Lab',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual({
+      workspace: provision.mock.results[0].value,
+    });
+    expect(provision).toHaveBeenCalledWith({
+      ...WORKSPACE,
+      workspaceName: 'New Lab',
+    });
+  });
+
   it('does not permit portal registration before the first administrator exists', async () => {
     const instance = backend();
     const client = instance.client();

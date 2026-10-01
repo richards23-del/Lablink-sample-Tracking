@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import express from 'express';
 import { createApp } from './app.js';
+import { ApiError } from './errors.js';
+import { WorkspaceDirectory } from './workspaces.js';
 import { startWorker } from './worker.js';
 
 const production = process.env.NODE_ENV === 'production';
@@ -41,7 +44,11 @@ if (configuredOrigins)
       throw new Error('Production application origins must use HTTPS.');
   }
 
-const { app, close, samples, communications } = createApp({
+const directory = new WorkspaceDirectory(
+  process.env.WORKSPACE_REGISTRY_PATH ?? resolve('data/workspaces.sqlite'),
+  process.env.WORKSPACE_DIRECTORY ?? resolve('data/workspaces'),
+);
+const appOptions = {
   databasePath: process.env.DATABASE_PATH ?? resolve('data/lablink.sqlite'),
   production,
   allowedOrigins: configuredOrigins,
@@ -51,8 +58,29 @@ const { app, close, samples, communications } = createApp({
     high: Number(process.env.LABLINK_TAT_HIGH_HOURS ?? 8),
     urgent: Number(process.env.LABLINK_TAT_URGENT_HOURS ?? 2),
   },
+};
+const root = createApp({
+  ...appOptions,
+  workspaceProvisioner: { provision: (input) => directory.provision(input) },
 });
-const worker = startWorker(samples, communications);
+const workers = [startWorker(root.samples, root.communications)];
+const workspaces = new Map<string, ReturnType<typeof createApp>>();
+const app = express();
+app.use('/w/:workspace', (request, response, next) => {
+  const record = directory.find(request.params.workspace);
+  if (!record)
+    return next(
+      new ApiError(404, 'Laboratory workspace not found.', 'NOT_FOUND'),
+    );
+  let workspace = workspaces.get(record.slug);
+  if (!workspace) {
+    workspace = createApp({ ...appOptions, databasePath: record.databasePath });
+    workspaces.set(record.slug, workspace);
+    workers.push(startWorker(workspace.samples, workspace.communications));
+  }
+  workspace.app(request, response, next);
+});
+app.use(root.app);
 const server = app.listen(port, host, () =>
   console.log(`LabLink API listening on http://${host}:${port}`),
 );
@@ -61,8 +89,10 @@ function shutdown() {
   if (stopping) return;
   stopping = true;
   server.close(async () => {
-    await worker.stop();
-    close();
+    await Promise.all(workers.map((worker) => worker.stop()));
+    for (const workspace of workspaces.values()) workspace.close();
+    root.close();
+    directory.close();
     process.exit(0);
   });
   setTimeout(() => {

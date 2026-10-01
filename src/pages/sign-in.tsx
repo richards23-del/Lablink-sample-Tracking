@@ -1,7 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowRight, FlaskConical, Loader2, TestTube2 } from 'lucide-react';
 import type { Session } from '@shared/types';
-import { ApiError, useLogin, useRegister, useSetup } from '@/lib/api';
+import {
+  ApiError,
+  useCreateWorkspace,
+  useLogin,
+  useRegister,
+  useSetup,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +17,8 @@ export default function SignInPage({ session }: { session: Session }) {
   const login = useLogin();
   const initialize = useSetup();
   const register = useRegister();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const createWorkspace = useCreateWorkspace();
+  const [mode, setMode] = useState<'login' | 'register' | 'workspace'>('login');
   const [fields, setFields] = useState({
     name: '',
     email: '',
@@ -24,7 +31,12 @@ export default function SignInPage({ session }: { session: Session }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const registering = !setup && mode === 'register';
-  const pending = login.isPending || initialize.isPending || register.isPending;
+  const creatingWorkspace = !setup && mode === 'workspace';
+  const pending =
+    login.isPending ||
+    initialize.isPending ||
+    register.isPending ||
+    createWorkspace.isPending;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,16 +51,19 @@ export default function SignInPage({ session }: { session: Session }) {
     const next: Record<string, string> = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email))
       next.email = 'Enter a valid email address.';
-    if (values.password.length < (setup || registering ? 12 : 1))
+    if (
+      values.password.length <
+      (setup || registering || creatingWorkspace ? 12 : 1)
+    )
       next.password = setup
         ? 'Use at least 12 characters.'
-        : registering
+        : registering || creatingWorkspace
           ? 'Use at least 12 characters.'
           : 'Enter your password.';
-    if (setup || registering) {
+    if (setup || registering || creatingWorkspace) {
       if (!values.name) next.name = 'Enter your name.';
     }
-    if (setup) {
+    if (setup || creatingWorkspace) {
       if (!values.workspaceName)
         next.workspaceName = 'Enter the laboratory or workspace name.';
       try {
@@ -69,7 +84,16 @@ export default function SignInPage({ session }: { session: Session }) {
           workspaceName: values.workspaceName,
           timezone: values.timezone,
         });
-      else if (registering)
+      else if (creatingWorkspace) {
+        const result = await createWorkspace.mutateAsync({
+          name: values.name,
+          email: values.email,
+          password: values.password,
+          workspaceName: values.workspaceName,
+          timezone: values.timezone,
+        });
+        window.location.assign(result.workspace.url);
+      } else if (registering)
         await register.mutateAsync({
           name: values.name,
           email: values.email,
@@ -156,16 +180,20 @@ export default function SignInPage({ session }: { session: Session }) {
           <h2 className="text-2xl font-bold tracking-tight">
             {setup
               ? 'Set up your workspace'
-              : registering
-                ? 'Create your portal account'
-                : 'Welcome back'}
+              : creatingWorkspace
+                ? 'Create your lab space'
+                : registering
+                  ? 'Create your portal account'
+                  : 'Welcome back'}
           </h2>
           <p className="mb-7 mt-2 text-sm leading-relaxed text-muted-foreground">
             {setup
               ? 'Create the first administrator account and choose your laboratory timezone.'
-              : registering
-                ? 'Choose the account that matches how you use the laboratory. Your laboratory must link requests to your account before they appear.'
-                : 'Sign in with your laboratory account to continue.'}
+              : creatingWorkspace
+                ? 'Set up an isolated laboratory workspace and its first administrator account.'
+                : registering
+                  ? 'Choose the account that matches how you use the laboratory. Your laboratory must link requests to your account before they appear.'
+                  : 'Sign in with your laboratory account to continue.'}
           </p>
           {session.setupRequired && !session.setupAllowed ? (
             <div className="rounded-xl border border-border bg-card p-5">
@@ -176,14 +204,15 @@ export default function SignInPage({ session }: { session: Session }) {
             </div>
           ) : (
             <form onSubmit={submit} noValidate className="space-y-5">
-              {(setup || registering) &&
+              {(setup || registering || creatingWorkspace) &&
                 field(
-                  setup ? 'workspaceName' : 'name',
-                  setup ? 'Workspace name' : 'Your name',
+                  setup || creatingWorkspace ? 'workspaceName' : 'name',
+                  setup || creatingWorkspace ? 'Laboratory name' : 'Your name',
                   'text',
-                  setup ? 'organization' : 'name',
+                  setup || creatingWorkspace ? 'organization' : 'name',
                 )}
-              {setup && field('name', 'Your name', 'text', 'name')}
+              {(setup || creatingWorkspace) &&
+                field('name', 'Your name', 'text', 'name')}
               {registering && (
                 <div className="space-y-2">
                   <Label htmlFor="auth-role">I am registering as</Label>
@@ -214,9 +243,11 @@ export default function SignInPage({ session }: { session: Session }) {
                 'password',
                 'Password',
                 'password',
-                setup || registering ? 'new-password' : 'current-password',
+                setup || registering || creatingWorkspace
+                  ? 'new-password'
+                  : 'current-password',
               )}
-              {setup && (
+              {(setup || creatingWorkspace) && (
                 <>
                   <p className="-mt-2 text-xs text-muted-foreground">
                     Choose a password with at least 12 characters.
@@ -276,7 +307,7 @@ export default function SignInPage({ session }: { session: Session }) {
                 ) : (
                   <ArrowRight aria-hidden="true" />
                 )}
-                {setup
+                {setup || creatingWorkspace
                   ? 'Create workspace'
                   : registering
                     ? 'Create account'
@@ -284,20 +315,41 @@ export default function SignInPage({ session }: { session: Session }) {
               </Button>
               {!setup && (
                 <p className="text-center text-sm text-muted-foreground">
-                  {registering
+                  {registering || creatingWorkspace
                     ? 'Already have an account? '
                     : 'Need an account? '}
                   <button
                     type="button"
                     className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     onClick={() => {
-                      setMode(registering ? 'login' : 'register');
+                      setMode(
+                        registering || creatingWorkspace ? 'login' : 'register',
+                      );
                       setErrors({});
                       setMessage('');
                     }}
                     disabled={pending}
                   >
-                    {registering ? 'Sign in' : 'Create a portal account'}
+                    {registering || creatingWorkspace
+                      ? 'Sign in'
+                      : 'Create a portal account'}
+                  </button>
+                </p>
+              )}
+              {!setup && !registering && !creatingWorkspace && (
+                <p className="text-center text-sm text-muted-foreground">
+                  Managing a laboratory?{' '}
+                  <button
+                    type="button"
+                    className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    onClick={() => {
+                      setMode('workspace');
+                      setErrors({});
+                      setMessage('');
+                    }}
+                    disabled={pending}
+                  >
+                    Create lab space
                   </button>
                 </p>
               )}

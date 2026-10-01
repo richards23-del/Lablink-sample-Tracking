@@ -46,6 +46,7 @@ import {
   transitionSchema,
   userSchema,
 } from './validation.js';
+import type { ProvisionedWorkspace, WorkspaceInput } from './workspaces.js';
 
 const COOKIE_NAME = 'lablink_session';
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
@@ -68,6 +69,9 @@ export interface AppOptions {
   loginMaxAttempts?: number;
   enqueueCommunication?: EnqueueCommunication;
   communications?: CommunicationsOptions;
+  workspaceProvisioner?: {
+    provision: (input: WorkspaceInput) => ProvisionedWorkspace;
+  };
 }
 
 type SessionRow = {
@@ -452,6 +456,20 @@ export function createApp(options: AppOptions) {
     })();
     createSession(response, user, authContext(response).session);
     response.status(201).json(sessionResponse(request, response));
+  });
+
+  app.post('/api/workspaces', (request, response) => {
+    if (!options.workspaceProvisioner)
+      throw new ApiError(
+        404,
+        'Lab-space creation is not enabled here.',
+        'NOT_FOUND',
+      );
+    rateLimitRegistration(request);
+    const workspace = options.workspaceProvisioner.provision(
+      setupSchema.parse(request.body),
+    );
+    response.status(201).json({ workspace });
   });
 
   app.post('/api/auth/logout', (request, response) => {
