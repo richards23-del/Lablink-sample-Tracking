@@ -34,9 +34,11 @@ export function openDatabase(filename: string): LabDatabase {
             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK (role IN ('admin', 'technician', 'reviewer', 'clinician', 'patient', 'transporter')),
+            active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL
           );
-          INSERT INTO users_v2 SELECT id, name, email, password_hash, role, created_at FROM users;
+          INSERT INTO users_v2 (id, name, email, password_hash, role, created_at)
+          SELECT id, name, email, password_hash, role, created_at FROM users;
           DROP TABLE users;
           ALTER TABLE users_v2 RENAME TO users;
         `);
@@ -67,6 +69,7 @@ export function openDatabase(filename: string): LabDatabase {
       email TEXT NOT NULL UNIQUE COLLATE NOCASE,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('admin', 'technician', 'reviewer', 'clinician', 'patient', 'transporter')),
+      active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS sessions (
@@ -160,6 +163,21 @@ export function openDatabase(filename: string): LabDatabase {
     );
     PRAGMA user_version = 2;
   `);
+  const userColumns = database.prepare('PRAGMA table_info(users)').all() as {
+    name: string;
+  }[];
+  if (!userColumns.some((column) => column.name === 'active'))
+    database.exec(
+      'ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1',
+    );
+  database.exec(`
+    CREATE TRIGGER IF NOT EXISTS security_audit_no_update
+    BEFORE UPDATE ON security_audit
+    BEGIN SELECT RAISE(ABORT, 'Security audit entries are append-only.'); END;
+    CREATE TRIGGER IF NOT EXISTS security_audit_no_delete
+    BEFORE DELETE ON security_audit
+    BEGIN SELECT RAISE(ABORT, 'Security audit entries are append-only.'); END;
+  `);
   return database;
 }
 
@@ -178,9 +196,10 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 export function getUser(database: LabDatabase, id: number): User | undefined {
   const row = database
-    .prepare('SELECT id, name, email, role FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, role, active FROM users WHERE id = ?')
     .get(id) as
-    { id: number; name: string; email: string; role: Role } | undefined;
+    | { id: number; name: string; email: string; role: Role; active: number }
+    | undefined;
   if (!row) return undefined;
   const setting = (key: string, fallback: string) =>
     (
@@ -188,7 +207,11 @@ export function getUser(database: LabDatabase, id: number): User | undefined {
         { value: string } | undefined
     )?.value ?? fallback;
   return {
-    ...row,
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    active: Boolean(row.active),
     workspaceName: setting('workspace_name', 'LabLink'),
     timezone: setting('timezone', 'UTC'),
   };

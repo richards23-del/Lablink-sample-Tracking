@@ -8,6 +8,7 @@ import type {
   CreateSampleInput,
   SampleDetail,
   Session,
+  User,
 } from '../shared/types.js';
 import { createApp, type AppOptions } from './app.js';
 
@@ -354,6 +355,36 @@ describe('authentication and request boundaries', () => {
       },
     );
     expect(duplicate.status).toBe(400);
+  });
+
+  it('lets administrators deactivate accounts, revoke sessions, and reactivate them', async () => {
+    const instance = await initialized();
+    const technician = await account(
+      instance.app,
+      instance.admin,
+      'technician',
+    );
+    const user = (await instance.admin.get('/api/users')).body.find(
+      (candidate: { role: string }) => candidate.role === 'technician',
+    ) as User;
+    const deactivated = await instance.admin.post(
+      `/api/users/${user.id}/deactivate`,
+    );
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.active).toBe(false);
+    expect((await technician.get('/api/dashboard')).status).toBe(401);
+    await technician.session();
+    expect(
+      (
+        await technician.post('/api/auth/login', {
+          email: user.email,
+          password: PASSWORD,
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (await instance.admin.post(`/api/users/${user.id}/activate`)).body.active,
+    ).toBe(true);
   });
 
   it('creates an isolated lab-space through the configured provisioner', async () => {

@@ -800,7 +800,9 @@ describe('follow-up, integration and durable upgrades', () => {
     const legacy = new Database(databasePath);
     legacy.pragma('foreign_keys = OFF');
     legacy.exec(`CREATE TABLE users_v1 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','technician','reviewer')), created_at TEXT NOT NULL);
-      INSERT INTO users_v1 SELECT * FROM users; DROP TABLE users; ALTER TABLE users_v1 RENAME TO users;
+      INSERT INTO users_v1 (id, name, email, password_hash, role, created_at)
+      SELECT id, name, email, password_hash, role, created_at FROM users;
+      DROP TABLE users; ALTER TABLE users_v1 RENAME TO users;
       UPDATE samples SET payload = json_remove(payload, '$.requestKind', '$.contacts', '$.patientResultAccess', '$.clinicalAcknowledgedAt', '$.lastClinicianReminderAt');
       PRAGMA user_version = 1;`);
     legacy.close();

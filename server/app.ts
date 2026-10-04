@@ -276,9 +276,14 @@ export function createApp(options: AppOptions) {
           )
           .get(tokenHash(token), now().getTime()) as SessionRow | undefined)
       : undefined;
+    const user = row?.user_id ? (getUser(database, row.user_id) ?? null) : null;
+    if (row && user && !user.active)
+      database
+        .prepare('DELETE FROM sessions WHERE token_hash = ?')
+        .run(row.token_hash);
     response.locals.auth = {
       session: row ?? null,
-      user: row?.user_id ? (getUser(database, row.user_id) ?? null) : null,
+      user: user?.active ? user : null,
     } satisfies AuthContext;
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const origin = request.get('origin');
@@ -431,13 +436,14 @@ export function createApp(options: AppOptions) {
     const input = loginSchema.parse(request.body);
     rateLimitLogin(request, input.email);
     const record = database
-      .prepare('SELECT id, password_hash FROM users WHERE email = ?')
-      .get(input.email) as { id: number; password_hash: string } | undefined;
+      .prepare('SELECT id, password_hash, active FROM users WHERE email = ?')
+      .get(input.email) as
+      { id: number; password_hash: string; active: number } | undefined;
     const matches = verifyPassword(
       input.password,
       record?.password_hash ?? dummyPassword,
     );
-    if (!record || !matches) {
+    if (!record || !record.active || !matches) {
       recordFailedLogin(request, input.email);
       throw new ApiError(
         401,
@@ -690,6 +696,58 @@ export function createApp(options: AppOptions) {
       return user;
     })();
     response.status(201).json(user);
+  });
+  app.post('/api/users/:id/deactivate', (request, response) => {
+    const admin = requireAdmin(response);
+    const id = resourceId(request.params.id);
+    if (id === admin.id)
+      throw new ApiError(
+        409,
+        'You cannot deactivate your own active session.',
+        'LAST_ADMIN',
+      );
+    const user = getUser(database, id);
+    if (!user) throw new ApiError(404, 'Account not found.', 'NOT_FOUND');
+    if (!user.active) return response.json(user);
+    database.transaction(() => {
+      if (user.role === 'admin') {
+        const activeAdmins = database
+          .prepare(
+            "SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND active = 1",
+          )
+          .get() as { count: number };
+        if (activeAdmins.count <= 1)
+          throw new ApiError(
+            409,
+            'Keep at least one active administrator.',
+            'LAST_ADMIN',
+          );
+      }
+      database.prepare('UPDATE users SET active = 0 WHERE id = ?').run(id);
+      database.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
+      database
+        .prepare(
+          'INSERT INTO security_audit (actor_id, action, subject_id, timestamp) VALUES (?, ?, ?, ?)',
+        )
+        .run(admin.id, 'user_deactivated', id, now().toISOString());
+    })();
+    response.json(getUser(database, id));
+  });
+  app.post('/api/users/:id/activate', (request, response) => {
+    const admin = requireAdmin(response);
+    const id = resourceId(request.params.id);
+    const user = getUser(database, id);
+    if (!user) throw new ApiError(404, 'Account not found.', 'NOT_FOUND');
+    if (user.active) return response.json(user);
+    database.transaction(() => {
+      database.prepare('UPDATE users SET active = 1 WHERE id = ?').run(id);
+      database
+        .prepare(
+          'INSERT INTO security_audit (actor_id, action, subject_id, timestamp) VALUES (?, ?, ?, ?)',
+        )
+        .run(admin.id, 'user_activated', id, now().toISOString());
+    })();
+    response.json(getUser(database, id));
   });
   app.get('/api/preferences', (_request, response) =>
     response.json(samples.preferences(authenticatedUser(response).id)),

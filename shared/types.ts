@@ -39,6 +39,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  active: boolean;
   workspaceName: string;
   timezone: string;
 }
