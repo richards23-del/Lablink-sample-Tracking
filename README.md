@@ -1,172 +1,86 @@
-# LabLink
+# LabLink — Laboratory Specimen Tracking
 
-LabLink tracks specimens and informs the people waiting for them. It aims to reduce missed results, unnecessary hospital visits and lost recollections through status notifications, clinician follow-up and private result portals. It combines React, an Express API and persistent SQLite storage. It can run as a laboratory workspace or connect to an existing laboratory system through an authenticated event API. No patient records or default credentials are bundled.
+[![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
+![Node.js](https://img.shields.io/badge/Node.js-20.19%2B%20%7C%2022.12%2B-339933?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)
+
+LabLink is a full-stack specimen-tracking application built around auditable laboratory workflows, role-based access, private portals, and configurable status notifications. It is designed to demonstrate practical application engineering: typed frontend/API contracts, server-enforced authorization, persistent storage, automated tests, and deployment safeguards.
+
+> **Safety note:** This repository is a software demonstration, not a certified clinical product. Use synthetic data for evaluation. Do not enter real patient information into the free preview deployment.
+
+## At a glance
+
+- **Frontend:** React, TypeScript, Vite
+- **API:** Node.js, Express, TypeScript
+- **Storage:** SQLite
+- **Verification:** TypeScript checks, unit/API tests, Playwright browser tests, formatting checks, GitHub Actions
+- **Integrations:** Authenticated event API; optional Twilio SMS/WhatsApp and Resend email delivery
+- **Deployment:** Docker/Compose and documented review deployment options
+
+## Key workflows
+
+- Register specimens, track processing, submit for verification, and release results through explicit role-controlled transitions.
+- Keep an audit timeline and detect conflicting updates rather than silently overwriting another user's work.
+- Provide patients, clinicians, and transporters with separate, explicitly assigned portal access.
+- Queue status messages with preview mode as the default; external messages do not include clinical result contents.
+- Track overdue specimens and follow-ups, with configurable targets and workspace timezone support.
+- Connect an existing laboratory information system through an authenticated, idempotent event API.
 
 ## Run locally
 
-Use Node.js 22.12 or newer (Node 20.19 is also supported).
+**Requirements:** Node.js 22.12+ (Node 20.19+ is also supported).
 
-```powershell
+```bash
 npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. On the first visit, create the workspace and its administrator account, choose the laboratory timezone and set a password of at least 12 characters. Browser setup is limited to the local development server and is disabled after the first account exists. In Settings, add laboratory staff, clinicians, patients and transporters as needed. Link portal accounts to the correct request during specimen registration.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). On first launch, create a workspace and administrator account. The development frontend proxies API requests to the local server. Configuration options are documented in [`.env.example`](.env.example).
 
-Patients, clinicians and transporters can also choose **Create a portal account** from the sign-in screen. Self-registration never creates administrator, technician or reviewer access. A portal account has no records until laboratory staff explicitly link it to a request; matching a name, email address or patient identifier does not grant access.
+## Verify the project
 
-The API listens on `127.0.0.1:3001`. The development frontend proxies `/api` to it. Stop both processes with Ctrl+C. Accounts, specimens, notes, preferences, alerts and notification records remain in `data/lablink.sqlite` across restarts.
-
-Optional configuration is documented in [.env.example](.env.example). Copy it to `.env` only if you need different ports, paths, allowed origins or turnaround targets. Both frontend configuration and server startup read `.env`. If changing ports, update the allowed browser origins accordingly.
-
-## Supported workflow
-
-1. An administrator or technician registers a collected specimen.
-2. An administrator or technician starts processing.
-3. Processing is submitted for verification with a result summary and quality-check confirmation.
-4. An administrator or reviewer checks the recorded information and explicitly authorizes release.
-5. An active specimen can instead require recollection. The replacement receives its own identifier and remains linked to the original specimen. The original history is retained.
-
-The server enforces roles and transitions even for direct API requests. State-changing specimen actions include the record version; an intervening update causes a conflict instead of silently overwriting another user's work. Notes receive server-generated identifiers, timestamps and the authenticated author's name.
-
-| Capability                                  | Administrator | Technician | Reviewer |
-| ------------------------------------------- | ------------- | ---------- | -------- |
-| View specimens, notes, timelines and alerts | Yes           | Yes        | Yes      |
-| Add operational notes / acknowledge alerts  | Yes           | Yes        | Yes      |
-| Register specimens and replacements         | Yes           | Yes        | No       |
-| Start processing / submit for verification  | Yes           | Yes        | No       |
-| Release verified results                    | Yes           | No         | Yes      |
-| Request recollection                        | Yes           | Yes        | Yes      |
-| Resolve alerts                              | Yes           | No         | Yes      |
-| Add team accounts                           | Yes           | No         | No       |
-
-Acknowledgement records that somebody has seen an alert; it does not resolve it. Recollection alerts are resolved when a replacement is registered. Overdue specimens retain their processing state; the overdue filter is a separate view of active specimens past their target. Default targets are 24 hours for routine, 8 for high priority and 2 for urgent, measured from receipt. These are configurable operational defaults and must be approved for the intended laboratory workflow.
-
-Staff notification preferences affect future **in-app** messages. Request-form contacts and selected delivery channels separately control patient, clinician and transporter messages. Alerts remain available independently of notification preferences.
-
-## Status messages and portals
-
-At intake, select whether the request came from a clinician or directly from the patient. Record the relevant contact information and choose SMS, email and/or WhatsApp for each recipient. A contact without selected channels receives no external messages. Portal accounts are linked explicitly; matching an email address or patient identifier alone never grants access.
-
-| Recipient   | Status notifications                                                                                                          | Portal access                                                                                                                                                  |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Patient     | Sample received; rejected, visit your healthcare provider; results delayed; results available, visit your healthcare provider | Own assigned specimens only. Clinician-requested results require permission from the assigned clinician. Direct customers can view their own released results. |
-| Clinician   | Sample received; rejection with its reason; results delayed; results available; reminders for unacknowledged results          | Assigned requests and released results; acknowledge results and grant or revoke patient viewing permission.                                                    |
-| Transporter | Sample received; results ready for collection                                                                                 | Assigned logistics status only; no clinical results, notes or rejection reasons.                                                                               |
-
-The server applies these restrictions to API responses as well as the interface. Unreleased results remain hidden from external roles. Clinical notes and internal audit details are not exposed through patient or transporter portals. Laboratory staff cannot grant patients access to clinician-requested results.
-
-The Follow-ups page retains rejected specimens until a linked replacement is registered and clinician-requested results until the assigned clinician acknowledges them. A background worker checks delays and unacknowledged results every minute, even when nobody is viewing the application. Clinician reminders begin 24 hours after release and repeat at most once every 24 hours until acknowledgement. An assigned patient can also request a clinician reminder after release, subject to a 24-hour cooldown. Acknowledgement records receipt of the result; it does not claim that treatment has occurred.
-
-## Delivery configuration
-
-**Preview mode is the default.** Communications shows queued messages and their recipient, selected channel, masked destination and processing status. A preview means no message was sent. This allows the complete workflow to be reviewed without provider accounts.
-
-For live delivery, configure `.env` using [.env.example](.env.example), then restart the server:
-
-- SMS: Twilio account credentials and an SMS sender.
-- WhatsApp: Twilio WhatsApp sender and three approved templates, one per recipient role. Template variables are `{{1}}` for the sample reference and `{{2}}` for the permitted status text.
-- Email: a Resend API key and a verified sender address/domain.
-- Set `LABLINK_DELIVERY_MODE=live` only when configuration and request-form contacts are ready.
-
-Messages never include the actual clinical result. Patient messages also exclude rejection reasons and internal instructions. The clinician rejection message includes the recorded reason as requested by the workflow. Provider credentials remain server-side.
-
-Password reset links are one-time tokens that expire after 30 minutes. The reset request always returns the same message whether or not the email belongs to an account. Reset emails use the same Resend configuration and are sent only when `LABLINK_DELIVERY_MODE=live`, `RESEND_API_KEY`, and a verified `RESEND_FROM` value are configured. Preview mode deliberately does not reveal reset links or send email.
-
-The persistent outbox deduplicates events, records attempts and applies bounded retries. Missing provider configuration is reported as blocked. Provider acceptance is shown as **accepted**, not delivered or read; delivery receipts are not implemented. Ambiguous SMS/WhatsApp outcomes are marked uncertain to avoid automatic duplicate sends. Check the provider console before manually retrying an uncertain message. Existing previews do not become live sends when configuration changes.
-
-See [the integration guide](docs/INTEGRATION.md) for connecting an existing LIS/LIMS, event payloads, API keys and idempotent retries. Connected mode enables event imports; the laboratory workspace remains available. A vendor-specific connector must map the existing system's events to this API.
-
-Daily dashboard counts use the workspace timezone. Timestamp inputs for collection use the browser's local time and are converted to an absolute timestamp; record displays use the laboratory timezone.
-
-## Checks
-
-```powershell
-npm run typecheck
-npm test
-npm run build
+```bash
+npm run format:check
+npm run check
 npx playwright install chromium
 npm run test:e2e
-npm run format:check
 ```
 
-`npm run check` runs TypeScript checking, unit/API tests and the build. API tests use isolated databases. Browser tests start a separate frontend on port 5180 and API on port 3101 with a fresh database in the operating system's temporary directory; they do not modify the normal workspace database. Synthetic test accounts and specimens exist only in those test databases. Traces and screenshots are retained for failed browser tests under `test-results`.
+The automated checks use isolated test data. CI runs formatting, application checks, and Chromium workflow tests; it does not require external messaging credentials.
 
-CI runs formatting, application checks and Chromium workflow tests. No external service credentials are required.
+## Architecture and documentation
 
-## Production process
+| Location | Purpose |
+| --- | --- |
+| `src/pages`, `src/features` | User-facing pages and specimen workflows |
+| `server/app.ts`, `server/samples.ts` | API entry points, authorization and specimen operations |
+| `server/database.ts` | SQLite schema and password handling |
+| `server/communications.ts` | Notification queue and provider adapters |
+| `server/integration.ts` | Authenticated event imports and idempotency |
+| [Integration guide](docs/INTEGRATION.md) | Existing LIS/LIMS integration |
+| [Environment example](.env.example) | Configuration reference without live credentials |
 
-Build with `npm ci` and `npm run build`. `npm start` serves both the compiled frontend and API from the server; a static-only frontend upload is insufficient.
+## Production and security considerations
 
-Provision an empty production database with `npm run admin:create`, using `LABLINK_ADMIN_NAME`, `LABLINK_ADMIN_EMAIL`, `LABLINK_ADMIN_PASSWORD`, and optionally `LABLINK_WORKSPACE_NAME` / `LABLINK_TIMEZONE`. Use a protected environment or secret manager. The command refuses to initialize a database that already contains users. Clear the provisioning password from the environment afterward. Do not commit credentials to source control.
+- Keep credentials in a secret manager or protected deployment environment; never commit real `.env` files.
+- Use HTTPS, a durable protected database volume, restricted administrator access, and tested backups before any production use.
+- Preview mode is the default. Enable live messaging only after validating provider credentials, sender identities, recipient data, and approved templates.
+- The free review deployment uses ephemeral storage and is intended for demonstration data only.
+- Structured clinical result validation, analyzer interfaces, and independent-reviewer separation are not implemented. The audit history is application-managed and is not a claim of tamper-proof storage or regulatory certification.
 
-Set `DATABASE_PATH` to a durable storage location and `APP_ORIGIN` to the exact HTTPS browser origin, without a trailing slash. Run behind a TLS-terminating reverse proxy. The server binds to loopback by default; change `HOST` only to match the deployment architecture. Production cookies are Secure, HttpOnly and SameSite=Strict; plain HTTP is not the supported production login path. Ensure the reverse proxy routes both application pages and `/api` to the server.
+See [Operations and deployment details](README.md#production-process) in the full documentation below for database provisioning, hosting notes, backup/restore, and deployment configuration.
 
-### Free review deployment on Render
+## Contributing
 
-For a short colleague review, deploy the public GitHub repository as a **Web Service** on [Render](https://render.com/docs/your-first-deploy). The included `render.yaml` selects the Node runtime, builds the application, binds it publicly and uses Render's HTTPS URL as the trusted application origin automatically. Create the service with the **Free** plan, then share its `onrender.com` address.
+Bug reports and improvements are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and review [SECURITY.md](SECURITY.md) before reporting a potential vulnerability.
 
-This configuration deliberately uses `/tmp/lablink.sqlite` and preview-only communications. Render's free web services lose local files when they restart or spin down, so it is suitable for demonstration records only. Do not enter real patient data or credentials there. A durable deployment needs a persistent database and configured messaging providers.
+---
 
-```powershell
-$env:APP_ORIGIN = 'https://lab.example.org'
-$env:DATABASE_PATH = 'C:\LabLinkData\lablink.sqlite'
-npm start
-```
+The detailed workflow, role matrix, delivery configuration, production deployment instructions, backup procedure, and full project layout follow below.
 
-### Replit deployment
+## Detailed documentation
 
-This is a full-stack application, so publish it as a web-server deployment, not a static site. The included [.replit](.replit) file uses `npm run build` and starts the application on the platform-provided port. Replit deployments expose one application port, and the server must bind beyond `localhost`; the deployment command therefore sets `HOST=0.0.0.0`. Replit documents that requirement for Autoscale and Reserved VM deployments. [Replit port configuration](https://docs.replit.com/references/project-setup/ports)
+The sections below describe the supported workflows, role permissions, message delivery, production deployment, backup and recovery, and project layout in detail.
 
-In the Replit Publish panel, set the build command to `npm run build` and the run command to `npx cross-env HOST=0.0.0.0 npm start`. Add these deployment secrets:
-
-```text
-APP_ORIGIN=https://lab-link-sample-tracking--richardkiyimba9.replit.app
-DATABASE_PATH=/path/to/durable/lablink.sqlite
-```
-
-Use the exact published URL for `APP_ORIGIN`; it protects authenticated write requests from untrusted origins. Add any SMS, WhatsApp and email provider values from [.env.example](.env.example) as deployment secrets, never source files. Keep `LABLINK_DELIVERY_MODE=preview` until the provider configuration, sender identities and WhatsApp templates have been checked.
-
-This application needs durable persistent storage for the SQLite database. Select a deployment/storage arrangement that preserves the database across restarts and verify backup/restore before entering real records. A Reserved VM is appropriate for the app's background notifications and API service; Replit describes it as an always-on web-server deployment with configurable ports. [Replit Reserved VM deployments](https://docs.replit.com/references/publishing/reserved-vm-deployments)
-
-The API rejects cross-origin writes, checks CSRF tokens, expires sessions, rate-limits login attempts, validates request bodies and returns no-store responses. Passwords are salted and hashed. Application fonts are served locally. Patient records and credentials are omitted from normal request-error logs.
-
-LabLink supports separate laboratory workspaces. From the public sign-in page, a laboratory can select **Create lab space**, then provide its laboratory name, first administrator and timezone. The system creates a separate SQLite database and a dedicated `/w/<lab-name>` URL. Session cookies are scoped to that URL, so signing into one laboratory does not replace another laboratory's session. Laboratory staff can view only their workspace specimens; external roles see only explicitly assigned records.
-
-Multi-workspace hosting requires durable storage for both `DATABASE_PATH` and the workspace registry/directory (`WORKSPACE_REGISTRY_PATH` and `WORKSPACE_DIRECTORY`). The included free Render review configuration stores these under `/tmp` deliberately and is not suitable for real records or ongoing use. A production deployment must attach persistent encrypted storage, use managed backups, restrict administrator access, and configure an exact HTTPS `APP_ORIGIN`.
-
-Structured clinical result validation, account deactivation/password recovery, analyzer interfaces and independent-reviewer separation are not implemented. Results currently use a text summary. Administrators can both process and release a specimen. The standalone package covers specimen operations and communications; inventory purchasing, billing and instrument quality control are future modules.
-
-Before using real records, validate the laboratory's workflow and access policy, verify TLS and storage permissions, establish account lifecycle procedures, configure monitoring, and test backup/restore. The recorded audit history is application-managed; it is not a claim of tamper-proof storage or regulatory certification.
-
-## Database backup
-
-Stop the application before taking a file-level backup, and retain the SQLite database together with any accompanying `-wal`/`-shm` files that still exist. Use a protected destination outside the source directory. For live backups, use SQLite's supported online backup facility instead of copying an active database file. Verify restoration against an isolated installation and never overwrite the running production database as a test.
-
-Fresh databases initialize automatically. Schema version 1 is migrated transactionally to version 2 while preserving accounts, sessions, specimens and history. Take a protected backup before upgrading an existing installation. A newer unsupported database version is rejected rather than modified.
-
-## Operations deployment
-
-Use the included Docker deployment for an always-on service with a persistent data volume. Set the exact public HTTPS URL in a protected `.env` file, then run `docker compose -f docker-compose.production.yml up -d --build`. Put TLS in front of the container using a managed reverse proxy or load balancer. `GET /healthz` returns a small readiness response for service monitoring.
-
-Use `npm run backup` with `LABLINK_DATA_DIRECTORY` and `LABLINK_BACKUP_DIRECTORY` to create SQLite online backups without stopping the service. Store encrypted backups outside the server, retain them according to the laboratory's policy, and test restoration in an isolated environment. The backup script includes the root workspace registry and every lab-space database.
-
-## Project layout
-
-| Path                       | Responsibility                                                       |
-| -------------------------- | -------------------------------------------------------------------- |
-| `src/pages`                | Dashboard, authentication and feature views                          |
-| `src/features/samples`     | Specimen forms and workflow dialogs                                  |
-| `src/components`           | Application shell, accessible shared controls and recovery states    |
-| `src/lib/api.ts`           | Typed API requests, CSRF handling and cache consistency              |
-| `shared/types.ts`          | Frontend/server response contracts                                   |
-| `server/app.ts`            | HTTP routes, sessions, authorization entry points and error handling |
-| `server/samples.ts`        | Specimen workflows, audit records, alerts and metrics                |
-| `server/database.ts`       | SQLite schema and password handling                                  |
-| `server/validation.ts`     | Server-side request validation                                       |
-| `server/communications.ts` | Durable delivery queue, recipient templates and provider adapters    |
-| `server/integration.ts`    | Authenticated, idempotent imports from existing laboratory systems   |
-| `server/worker.ts`         | Background delay checks, clinician reminders and delivery processing |
-| `tests`                    | Browser workflows and accessibility checks                           |
-
-[PROJECT_REVIEW.md](PROJECT_REVIEW.md) preserves the original review as a historical baseline. [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) records the remediation and verification results.
