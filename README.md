@@ -1,40 +1,14 @@
 # LabLink — Laboratory Specimen Tracking
 
 [![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
-
-**A full-stack specimen workflow and result-coordination platform.**
-LabLink helps laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
-
-> **Demo and privacy note:** Use synthetic data for demonstrations. Do not enter real patient information into temporary or free deployments. Review the production guidance before real-world use.
-
-### At a glance
-
-- **Workflow:** registration, processing, verification, release, recollection, and follow-up.
-- **Access control:** separate roles for staff, patients, clinicians, and transporters.
-- **Communication:** SMS, email, and WhatsApp workflows; preview mode is enabled by default.
-- **Engineering:** React, TypeScript, Express, SQLite, automated checks, and browser tests.
-[![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
-
-**A full-stack specimen workflow and result-coordination platform** built to help laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
-
-> **Demo and privacy note:** Use synthetic data for demonstrations. Do not enter real patient information into temporary/free deployments. Review the production and data-storage guidance below before any real-world use.
-
-### At a glance
-
-- **Workflow:** specimen registration, processing, verification, release, recollection, and follow-up.
-- **Access control:** distinct administrator, technician, reviewer, patient, clinician, and transporter capabilities.
-- **Communication:** configurable SMS, email, and WhatsApp workflows, with preview mode enabled by default.
-- **Engineering:** React + TypeScript frontend, Express API, SQLite persistence, automated checks, and browser tests.
-
-[![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
 ![Node.js](https://img.shields.io/badge/Node.js-20.19%2B%20%7C%2022.12%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)
 
-LabLink is a full-stack specimen-tracking application built around auditable laboratory workflows, role-based access, private portals, and configurable status notifications. It is designed to demonstrate practical application engineering: typed frontend/API contracts, server-enforced authorization, persistent storage, automated tests, and deployment safeguards.
+**LabLink is a full-stack specimen-tracking and result-coordination platform** built to help laboratory teams manage sample workflows, follow-ups, and status notifications through role-based portals.
 
-> **Safety note:** This repository is a software demonstration, not a certified clinical product. Use synthetic data for evaluation. Do not enter real patient information into the free preview deployment.
+> **Demo and privacy note:** This repository is a software demonstration, not a certified clinical product. Use synthetic data only; do not enter real patient information into temporary or free preview deployments. Review the production and data-storage guidance before real-world use.
 
 ## At a glance
 
