@@ -2,6 +2,19 @@
 
 [![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
 
+**A full-stack specimen workflow and result-coordination platform.**
+LabLink helps laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
+
+> **Demo and privacy note:** Use synthetic data for demonstrations. Do not enter real patient information into temporary or free deployments. Review the production guidance before real-world use.
+
+### At a glance
+
+- **Workflow:** registration, processing, verification, release, recollection, and follow-up.
+- **Access control:** separate roles for staff, patients, clinicians, and transporters.
+- **Communication:** SMS, email, and WhatsApp workflows; preview mode is enabled by default.
+- **Engineering:** React, TypeScript, Express, SQLite, automated checks, and browser tests.
+[![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
+
 **A full-stack specimen workflow and result-coordination platform** built to help laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
 
 > **Demo and privacy note:** Use synthetic data for demonstrations. Do not enter real patient information into temporary/free deployments. Review the production and data-storage guidance below before any real-world use.
