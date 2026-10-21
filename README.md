@@ -1,6 +1,6 @@
 # LabLink — Laboratory Specimen Tracking
 
-[![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
+[![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
 
 **A full-stack specimen workflow and result-coordination platform.**
 LabLink helps laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
@@ -13,7 +13,7 @@ LabLink helps laboratory teams track samples, coordinate follow-ups, and share s
 - **Access control:** separate roles for staff, patients, clinicians, and transporters.
 - **Communication:** SMS, email, and WhatsApp workflows; preview mode is enabled by default.
 - **Engineering:** React, TypeScript, Express, SQLite, automated checks, and browser tests.
-[![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
+[![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
 
 **A full-stack specimen workflow and result-coordination platform** built to help laboratory teams track samples, coordinate follow-ups, and share status updates through role-restricted portals.
 
@@ -26,7 +26,7 @@ LabLink helps laboratory teams track samples, coordinate follow-ups, and share s
 - **Communication:** configurable SMS, email, and WhatsApp workflows, with preview mode enabled by default.
 - **Engineering:** React + TypeScript frontend, Express API, SQLite persistence, automated checks, and browser tests.
 
-[![Checks](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richards23-del/Lablink-sample-Tracking/actions/workflows/checks.yml)
+[![Checks](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml/badge.svg)](https://github.com/richarich-92/Lablink-sample-Tracking/actions/workflows/checks.yml)
 ![Node.js](https://img.shields.io/badge/Node.js-20.19%2B%20%7C%2022.12%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
